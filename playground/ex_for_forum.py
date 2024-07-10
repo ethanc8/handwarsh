@@ -412,6 +412,7 @@ def readEntry(entry, ename, indent, pname):
 
 #program starts here ...
 
+# Magic numbers
 magic1 = b'\x14\x00\x06\x00\x08\x00' #incl in zlib
 magic2 = b'\x23\x1D\xD5\x71\xDA\x81\x48\xA2\xA8\x58\x98\xB2\x1B\x89\xEF\x99' # marker for geometry
 zlib_hdr = b'\x78\x01'
@@ -419,120 +420,108 @@ xml_hdr = b'\x3C\x3F\x78\x6D\x6C'
 png_hdr = b'\x89\x50\x4E\x47'
 parasolid_hdr = b'PS\x00\x00'
 
-sldprt_path = sys.argv[1]
-sldprt_name = str(pathlib.Path(sldprt_path).name)
-sldprt_folder = pathlib.Path(sldprt_path).parent
+def extract_nonole_sldprt(sldprt_path, geofiles=[]):
+    sldprt_name = str(pathlib.Path(sldprt_path).name)
+    sldprt_folder = pathlib.Path(sldprt_path).parent
 
-magics = [magic1,zlib_hdr,xml_hdr,png_hdr,parasolid_hdr]
+    sldprt_file = open(sldprt_path, 'rb')
+    data = sldprt_file.read()
+    # file_size = sldprt_file.tell()
+    #print(file_size)
+    sldprt_file.close()
 
-OLEbased = False
+    markers_zlib = re.finditer(zlib_hdr, data)
+    magicspots_zlib = [line.start() for line in markers_zlib]
+    #print(len(magicspots_zlib))
 
-print(sldprt_path)
+    # Iterate over all zlib compressed sections
+    for z in magicspots_zlib:
+        #print("START ",z)
+        hexdump(data[z-16:z+16])
 
-try:
-    assert olefile.isOleFile(sldprt_path)
-    OLEbased = True
-except:
-    OLEbased = False
+        decomp_n = int.from_bytes(data[z-8:z-4],'little')
+        #print(decomp_n) #decompressed size
+        hexdump(data[z-8:z-4])
 
-print("OLE based : ", OLEbased)
+        comp_n = int.from_bytes(data[z-4:z],'little')
+        #print(comp_n) #compress size
+        hexdump(data[z-4:z])
 
-geofiles = []
-
-if not OLEbased:
-    with open(sldprt_path, 'rb') as sldprt_file:
-        data = sldprt_file.read()
-        file_size = sldprt_file.tell()
-        #print(file_size)
-
-        markers_zlib = re.finditer(zlib_hdr, data)
-        magicspots_zlib = [line.start() for line in markers_zlib]
-        #print(len(magicspots_zlib))
-
-        for z in magicspots_zlib:
-            #print("START ",z)
-            hexdump(data[z-16:z+16])
-
-            decomp_n = int.from_bytes(data[z-8:z-4],'little')
-            #print(decomp_n) #decompressed size
-            hexdump(data[z-8:z-4])
-
-            comp_n = int.from_bytes(data[z-4:z],'little')
-            #print(comp_n) #compress size
-            hexdump(data[z-4:z])
-
-            if decomp_n>0:
-                zlibobj = zlib.decompressobj()
-                data_decomp = zlibobj.decompress(data[z:z+comp_n],decomp_n)
-                if data_decomp[0:4] == parasolid_hdr:
-                    hexdump(data_decomp)
-                    if data_decomp.find(b'TRANSMIT FILE (deltas)') > 0:
-                        open(sldprt_folder / ('mytestgeomdelta'+ ('_%i') % z + '_deltas.x_b'), 'wb').write(data_decomp)
-                        geofiles.append(sldprt_folder / ('mytestgeomdelta'+ ('_%i') % z + '_deltas.x_b'))
-                    else:
-                        open(sldprt_folder / ('mytestgeom' + ('_%i') % z + '.x_b'), 'wb').write(data_decomp)
-                        geofiles.append(sldprt_folder / ('mytestgeom' + ('_%i') % z + '.x_b'))
-            '''
-            png_locns = [l for l in re.finditer(png_hdr, data_decomp)]
-            geometry_locns = [l for l in re.finditer(magic2, data_decomp)]
-            zlibposs_locns = [l for l in re.finditer(zlib_hdr, data_decomp)]
-            xml_locns = [l for l in re.finditer(xml_hdr, data_decomp)]
-            #hexdump(data_decomp[0:64])
-            print('geom ', geometry_locns)
-            print('poss zlib ', zlibposs_locns)
-            print('png locns', png_locns)
-            print('xml locns', xml_locns)
-            if len(png_locns) > 0:
-                open('mytest_%i.png' % cl, 'wb').write(data_decomp)
-            elif len(xml_locns) > 0 :
-                open('mytest_%i.xml' % cl, 'wb').write(data_decomp)
-            elif len(geometry_locns) > 0:
-                locns_start = [l.start() for l in geometry_locns]
-                previouslocn = 0
-                for j, x in enumerate(locns_start):
-                    offset_temp = x - 4  # -24
-                    if 1:  # try:
-                        #data_comp_2_hdr1 = data_decomp[(0 + offset_temp):(4 + offset_temp)]  # unknown
-                        #hexdump(data_comp_2_hdr1)
-                        #data_comp_2_hdr2 = data_decomp[(4 + offset_temp):(4 + 16 + offset_temp)]  # signature?
-                        data_comp_2_size_comp = data_decomp[(4 + 16 + offset_temp):(4 + 16 + 4 + offset_temp)]
-                        data_comp_2_size_decomp = data_decomp[
-                                                    (4 + 16 + 4 + offset_temp):(4 + 16 + 4 + 4 + offset_temp)]
-                        data_comp_2_size_comp_n = int.from_bytes(data_comp_2_size_comp, 'little')
-                        data_comp_2_size_decomp_n = int.from_bytes(data_comp_2_size_decomp, 'little')
-                        # print('>>>>',data_comp_2_size_comp_n,data_comp_2_size_decomp_n)
-                        unused_len = 0
-                        zlibobj2 = zlib.decompressobj()  # reinitialize bc can't reuse
-                        # hexdump(data_decomp[0:48])
-                        # print(len(data_decomp[(28+offset_temp):]))
-                        # quit()
-                        data_decomp2 = zlibobj2.decompress(data_decomp[(28 + offset_temp):],
-                                                            unused_len)  # skip ahead to where \x78\x01 should be
-                        unused_len = len(zlibobj2.unused_data)
-                        if unused_len > 0:
-                            print(">>>> length of unused data : ", unused_len)
-                            if unused_len <= 32:
-                                hexdump(zlibobj2.unused_data)
-                        # open('mytestgeom' + ('_%i_%i.x_b' % (i,j)), 'wb').write(data_decomp2)
-                        if data_decomp2[0:4] == parasolid_hdr:
-                            if data_decomp2.find(b'TRANSMIT FILE (deltas)') > 0:
-                                open('mytestgeom' + ('_%i_%i' % (cl, j)) + '_deltas.x_b', 'wb').write(data_decomp2)
-                                geofiles.append('mytestgeom' + ('_%i_%i' % (cl, j)) + '_deltas.x_b')
-                            else:
-                                open('mytestgeom' + ('_%i_%i') % (cl, j) + '.x_b', 'wb').write(data_decomp2)
-                                geofiles.append('mytestgeom' + ('_%i_%i') % (cl, j) + '.x_b')
+        if decomp_n>0:
+            zlibobj = zlib.decompressobj()
+            data_decomp = zlibobj.decompress(data[z:z+comp_n],decomp_n)
+            if data_decomp[0:4] == parasolid_hdr:
+                hexdump(data_decomp)
+                if data_decomp.find(b'TRANSMIT FILE (deltas)') > 0:
+                    open(sldprt_folder / ('mytestgeomdelta'+ ('_%i') % z + '_deltas.x_b'), 'wb').write(data_decomp)
+                    geofiles.append(sldprt_folder / ('mytestgeomdelta'+ ('_%i') % z + '_deltas.x_b'))
+                else:
+                    open(sldprt_folder / ('mytestgeom' + ('_%i') % z + '.x_b'), 'wb').write(data_decomp)
+                    geofiles.append(sldprt_folder / ('mytestgeom' + ('_%i') % z + '.x_b'))
+        '''
+        png_locns = [l for l in re.finditer(png_hdr, data_decomp)]
+        geometry_locns = [l for l in re.finditer(magic2, data_decomp)]
+        zlibposs_locns = [l for l in re.finditer(zlib_hdr, data_decomp)]
+        xml_locns = [l for l in re.finditer(xml_hdr, data_decomp)]
+        #hexdump(data_decomp[0:64])
+        print('geom ', geometry_locns)
+        print('poss zlib ', zlibposs_locns)
+        print('png locns', png_locns)
+        print('xml locns', xml_locns)
+        if len(png_locns) > 0:
+            open('mytest_%i.png' % cl, 'wb').write(data_decomp)
+        elif len(xml_locns) > 0 :
+            open('mytest_%i.xml' % cl, 'wb').write(data_decomp)
+        elif len(geometry_locns) > 0:
+            locns_start = [l.start() for l in geometry_locns]
+            previouslocn = 0
+            for j, x in enumerate(locns_start):
+                offset_temp = x - 4  # -24
+                if 1:  # try:
+                    #data_comp_2_hdr1 = data_decomp[(0 + offset_temp):(4 + offset_temp)]  # unknown
+                    #hexdump(data_comp_2_hdr1)
+                    #data_comp_2_hdr2 = data_decomp[(4 + offset_temp):(4 + 16 + offset_temp)]  # signature?
+                    data_comp_2_size_comp = data_decomp[(4 + 16 + offset_temp):(4 + 16 + 4 + offset_temp)]
+                    data_comp_2_size_decomp = data_decomp[
+                                                (4 + 16 + 4 + offset_temp):(4 + 16 + 4 + 4 + offset_temp)]
+                    data_comp_2_size_comp_n = int.from_bytes(data_comp_2_size_comp, 'little')
+                    data_comp_2_size_decomp_n = int.from_bytes(data_comp_2_size_decomp, 'little')
+                    # print('>>>>',data_comp_2_size_comp_n,data_comp_2_size_decomp_n)
+                    unused_len = 0
+                    zlibobj2 = zlib.decompressobj()  # reinitialize bc can't reuse
+                    # hexdump(data_decomp[0:48])
+                    # print(len(data_decomp[(28+offset_temp):]))
+                    # quit()
+                    data_decomp2 = zlibobj2.decompress(data_decomp[(28 + offset_temp):],
+                                                        unused_len)  # skip ahead to where \x78\x01 should be
+                    unused_len = len(zlibobj2.unused_data)
+                    if unused_len > 0:
+                        print(">>>> length of unused data : ", unused_len)
+                        if unused_len <= 32:
+                            hexdump(zlibobj2.unused_data)
+                    # open('mytestgeom' + ('_%i_%i.x_b' % (i,j)), 'wb').write(data_decomp2)
+                    if data_decomp2[0:4] == parasolid_hdr:
+                        if data_decomp2.find(b'TRANSMIT FILE (deltas)') > 0:
+                            open('mytestgeom' + ('_%i_%i' % (cl, j)) + '_deltas.x_b', 'wb').write(data_decomp2)
+                            geofiles.append('mytestgeom' + ('_%i_%i' % (cl, j)) + '_deltas.x_b')
                         else:
-                            print("not a parasolid block????")
-                        previouslocn += len(data_decomp2) + 28  # update locn in block add back header length
-                        #success = True
-                    # except:
-                    #    print('failure at secondary decompression')
-                    #    success = False
-            else:
-                print("we have something else ...")
-            '''
+                            open('mytestgeom' + ('_%i_%i') % (cl, j) + '.x_b', 'wb').write(data_decomp2)
+                            geofiles.append('mytestgeom' + ('_%i_%i') % (cl, j) + '.x_b')
+                    else:
+                        print("not a parasolid block????")
+                    previouslocn += len(data_decomp2) + 28  # update locn in block add back header length
+                    #success = True
+                # except:
+                #    print('failure at secondary decompression')
+                #    success = False
+        else:
+            print("we have something else ...")
+        '''
 
-elif OLEbased:
+def extract_ole_sldprt(sldprt_path, geofiles=[]):
+    sldprt_name = str(pathlib.Path(sldprt_path).name)
+    sldprt_folder = pathlib.Path(sldprt_path).parent
+
     #there can be different kinds of files in this type of archive.  .xlsx, .docx, etc in addition to
     #SW geometry.  That compression schemes is ZIP.  Some of the SW elements are themselves compressed
     # using ZLIB, with first 16 bytes being a header(?) followed by 8 bytes, the first four of which
@@ -603,20 +592,46 @@ elif OLEbased:
                         print('hmmm')
                         pass
     ole.close()
-else:
-    print('shouldnt get here')
 
-print(geofiles)
+def main():
+    sldprt_path = sys.argv[1]
+    sldprt_name = str(pathlib.Path(sldprt_path).name)
+    sldprt_folder = pathlib.Path(sldprt_path).parent
 
-if not geofiles:
-    print("No geometry was created")
-else:
-    for g in geofiles:
-        if str(g).find("deltas") == -1:
-            thegeometry = None
-            #THIS OLD VERSION HAS A PROBLEM IF THERE ARE NURBS OBJECTS IT SEEMS.  INDEXING GOES GOOFY
-            thegeometry, thegeometry2 = read_x_b(data_path=g, outfile_path=sldprt_folder / f"{g.name}_debuginfo.txt")
+    magics = [magic1,zlib_hdr,xml_hdr,png_hdr,parasolid_hdr]
 
+    ole_based = False
+
+    print(sldprt_path)
+
+    try:
+        assert olefile.isOleFile(sldprt_path)
+        ole_based = True
+    except:
+        ole_based = False
+
+    print("OLE based : ", ole_based)
+
+    geofiles = []
+    
+    if ole_based:
+        extract_ole_sldprt(sldprt_path, geofiles)
+    else:
+        extract_nonole_sldprt(sldprt_path, geofiles)
+
+    print(geofiles)
+
+    if not geofiles:
+        print("No geometry was created")
+    else:
+        for g in geofiles:
+            if str(g).find("deltas") == -1:
+                thegeometry = None
+                #THIS OLD VERSION HAS A PROBLEM IF THERE ARE NURBS OBJECTS IT SEEMS.  INDEXING GOES GOOFY
+                thegeometry, thegeometry2 = read_x_b(data_path=g, outfile_path=sldprt_folder / f"{g.name}_debuginfo.txt")
+
+if __name__ == "__main__":
+    main()
 
 
 
