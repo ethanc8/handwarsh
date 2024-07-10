@@ -226,9 +226,9 @@ def PStoFC(datatype, mygeom, index, fname, bufferreadfield):
 
     return mygeom
 
-def read_x_b(data_path: pathlib.PurePath, outfile_path: pathlib.PurePath):
+def read_x_b(data_path: pathlib.PurePath, logfile_path: pathlib.PurePath):
     """
-    Reads an x_b file from data_path and outputs debug information to outfile_path.
+    Reads an x_b file from data_path and outputs debug information to logfile_path.
     """
 
     #https://github.com/armthethinker/LGBTQ_VR_Museum/tree/df3c3084ee6decd5c9d8204134076fe207671da7/VRLiDARFromScratch/Assets/Plugins/PixyzPluginForUnity/Editor/Bin/PsSchema
@@ -239,7 +239,7 @@ def read_x_b(data_path: pathlib.PurePath, outfile_path: pathlib.PurePath):
     data = bytearray(data_file.read())
     data_file.close()
 
-    outfile = open(outfile_path, 'wt')
+    logfile = open(logfile_path, 'wt')
     mygeom = []
     mynodes = []
 
@@ -249,9 +249,9 @@ def read_x_b(data_path: pathlib.PurePath, outfile_path: pathlib.PurePath):
         eoh = b'**END_OF_HEADER*****************************************************************\n'
         eoh_pos = data.find(eoh)
         header, data = data[:eoh_pos] + eoh, data[eoh_pos + len(eoh):]
-        outfile.write(f"header = x_b_header {{\n")
-        outfile.write(header)
-        outfile.write(f'\n}};\n')
+        logfile.write(f"header = x_b_header {{\n")
+        logfile.write(header)
+        logfile.write(f'\n}};\n')
     assert data[:4] == b'PS\0\0'
 
     # Load head metadata
@@ -259,43 +259,43 @@ def read_x_b(data_path: pathlib.PurePath, outfile_path: pathlib.PurePath):
     buf = Buffer(data[4:])
 
     str1 = buf.string(buf.int16())
-    outfile.write(f'str1 = "{str1.decode()}";\n')
+    logfile.write(f'str1 = "{str1.decode()}";\n')
     str2 = buf.string(buf.int32())
-    outfile.write(f'str2 = "{str2.decode()}";\n')
+    logfile.write(f'str2 = "{str2.decode()}";\n')
     user_field_size = buf.int16()
-    outfile.write(f"user_field_size = {user_field_size};\n")
+    logfile.write(f"user_field_size = {user_field_size};\n")
 
     unk = buf.int32()
     assert unk == 0
-    outfile.write(f"unk = {unk};\n")
+    logfile.write(f"unk = {unk};\n")
 
     # Load all the nodes
 
-    outfile.write("nodes = [\n")
+    logfile.write("nodes = [\n")
 
     types_seen = []
     while not buf.end():
         datatype = buf.int16()
         if datatype == 1:
-            outfile.write('1 __terminator__ {\n')
+            logfile.write('1 __terminator__ {\n')
             terminator_a = buf.uint16()
-            outfile.write(f"    terminator_a: {terminator_a};\n")
+            logfile.write(f"    terminator_a: {terminator_a};\n")
             assert terminator_a == 1
             terminator_b = buf.end()
-            outfile.write(f"    terminator_b: {terminator_b};\n")
+            logfile.write(f"    terminator_b: {terminator_b};\n")
             if terminator_b:
-                outfile.write('    // EOF ok\n')
+                logfile.write('    // EOF ok\n')
             else:
-                outfile.write('    // Problem ?\n')
-            outfile.write("}\n")
+                logfile.write('    // Problem ?\n')
+            logfile.write("}\n")
             break
         if datatype in schema:
             name, desc, tx, var, fields = schema[datatype]
-            outfile.write(f"{datatype} {name} {{\n")
+            logfile.write(f"{datatype} {name} {{\n")
             # If this is the first time we've seen this node type, then
             # it comes with a schema
             if datatype not in types_seen:
-                outfile.write("    __schema__: {\n")
+                logfile.write("    __schema__: {\n")
                 types_seen.append(datatype)
                 nf = buf.uint8()
                 if nf != 0xFF:
@@ -304,17 +304,17 @@ def read_x_b(data_path: pathlib.PurePath, outfile_path: pathlib.PurePath):
                     while True:
                         c = buf.char()
                         if c == 'C':
-                            outfile.write('        Appended fields: '+(str(fields[ptr]))+'\n') #MattC
+                            logfile.write('        Appended fields: '+(str(fields[ptr]))+'\n') #MattC
                             new_fields.append(fields[ptr])
                             ptr += 1
                         elif c == 'D':
-                            outfile.write('        Deleted field: '+(str(fields[ptr]))+'\n') #MattC
+                            logfile.write('        Deleted field: '+(str(fields[ptr]))+'\n') #MattC
                             ptr += 1
                         elif c == 'I' or c == 'A':
                             if c == 'I':
-                                outfile.write('        Inserting field:\n') #MattC
+                                logfile.write('        Inserting field:\n') #MattC
                             else:
-                                outfile.write('        Appending field:\n') #MattC
+                                logfile.write('        Appending field:\n') #MattC
                             fname = buf.string(buf.uint8())
                             ptr_class = buf.uint16()
                             fne = buf.ptr()
@@ -325,50 +325,50 @@ def read_x_b(data_path: pathlib.PurePath, outfile_path: pathlib.PurePath):
                             if fne == 1:
                                 xmt_code = buf.uint8()
                             try:
-                                outfile.write('            '+(str(new_fields[-1])+'\n')) #MattC
+                                logfile.write('            '+(str(new_fields[-1])+'\n')) #MattC
                                 new_fields.append((fname.decode('utf-8'), ftype, ptr_class, fne))  # MattC
                             except:
-                                outfile.write("            // Ignore below; = KLUDGE to work around problem chars")
-                                outfile.write('            PROB chars?'+(str(new_fields[-1])+'\n')) #MattC
+                                logfile.write("            // Ignore below; = KLUDGE to work around problem chars")
+                                logfile.write('            PROB chars?'+(str(new_fields[-1])+'\n')) #MattC
                                 new_fields.append(('UNKNOWN', ftype, ptr_class, fne))  # MattC
                         elif c == 'Z':
                             break
                         else:
-                            outfile.write('        Unknown schema character %r\n' % c) #MattC
+                            logfile.write('        Unknown schema character %r\n' % c) #MattC
                             #raise Exception('Unknown schema character %r' % c) #MattC
                     schema[datatype][4] = new_fields
                     fields = new_fields
-                outfile.write("    },\n")
+                logfile.write("    },\n")
             assert tx
             if var:
                 var_size = buf.int32()
-                outfile.write(f"    __variable_size__: {var_size};\n") #MattC
+                logfile.write(f"    __variable_size__: {var_size};\n") #MattC
             else:
                 var_size = -1
             node = {} # MattC not used ????
             index = buf.int16()
-            outfile.write(f"    __index__: {index};\n") #MattC
+            logfile.write(f"    __index__: {index};\n") #MattC
 
             mygeom.append([datatype, [index]])
             mynodes.append([index, datatype, var_size, fields])
 
             for fname, ftype, nc, ne in fields:
                 bufferreadfield = buf.read_field(ftype, ne, var_size)
-                outfile.write(f"    {fname}: {bufferreadfield};\n")
+                logfile.write(f"    {fname}: {bufferreadfield};\n")
                 #Proof of concept test ...
                 #May need to change this to not collecting by datatype??
                 mygeom = PStoFC(datatype, mygeom, index, fname, bufferreadfield)
-            outfile.write("},\n") # end this node
+            logfile.write("},\n") # end this node
 
         else:
             print('unknown datatype:', datatype)
-            outfile.write(f"{datatype} __unknown__ {{}}, // fatal error: unknown datatype\n")
+            logfile.write(f"{datatype} __unknown__ {{}}, // fatal error: unknown datatype\n")
             assert False
-    outfile.write("]\n") # end "nodes"
-    outfile.close() #MattC
+    logfile.write("]\n") # end "nodes"
+    logfile.close() #MattC
     return mygeom , mynodes#MattC
     
-def hexdump(data, outfile=sys.stdout):
+def hexdump(data, logfile=sys.stdout):
     data = bytearray(data)
     for i in range(0, len(data), 16):
         hc = ''
@@ -387,7 +387,7 @@ def hexdump(data, outfile=sys.stdout):
             if j == 7:
                 hc += ' '
                 ac += ' '
-        outfile.write('%08x  %s | %s\n' % (i, hc, ac))
+        logfile.write('%08x  %s | %s\n' % (i, hc, ac))
 
 def readFile(afile, adirname, indent, parentname):
     sectionname = afile.name.encode("utf-8")  # becomes a byte array
@@ -526,7 +526,7 @@ def extract_ole_sldprt(sldprt_path, geofiles=[]):
     sldprt_name = str(pathlib.Path(sldprt_path).name)
     sldprt_folder = pathlib.Path(sldprt_path).parent
 
-    outfile = open(sldprt_folder / "handwarsh_out" / f"{sldprt_name}_debuginfo.txt", "wt")
+    logfile = open(sldprt_folder / "handwarsh_out" / f"{sldprt_name}_debuginfo.txt", "wt")
 
     #there can be different kinds of files in this type of archive.  .xlsx, .docx, etc in addition to
     #SW geometry.  That compression schemes is ZIP.  Some of the SW elements are themselves compressed
@@ -537,30 +537,30 @@ def extract_ole_sldprt(sldprt_path, geofiles=[]):
     with olefile.OleFileIO(sldprt_path) as ole:
         dirlist = ole.listdir()
         for d in dirlist:
-            outfile.write(f"{d}\n")
+            logfile.write(f"{d}\n")
             test = ole.openstream(d)
             data = test.read()
             datalen = len(data)
 
             magiclocns = re.finditer(magic2, data) #find geom
             magicspots = [line.start() for line in magiclocns]
-            outfile.write(f"{magicspots}\n")
-            hexdump(data[:48], outfile)
+            logfile.write(f"{magicspots}\n")
+            hexdump(data[:48], logfile)
             #for idx, magicloc in enumerate(magiclocns):
             for idx in magicspots:
                 #prevlocn = magicloc.start()-4
                 prevlocn = idx - 4
                 if 1:
-                    outfile.write(f"{data[(prevlocn+4+0):(prevlocn+4+16)]}\n")
-                    outfile.write(f"{magic2}\n")
+                    logfile.write(f"{data[(prevlocn+4+0):(prevlocn+4+16)]}\n")
+                    logfile.write(f"{magic2}\n")
                     if data[(prevlocn+4+0):(prevlocn+4+16)] == magic2:
                         zobj = zlib.decompressobj()
                         dsize = (int.from_bytes(data[(prevlocn+20):(prevlocn+24)],'little'))
                         csize = (int.from_bytes(data[(prevlocn+24):(prevlocn+28)],'little'))
                         data_comp = data[(prevlocn+28):]
                         data_decomp = zobj.decompress(data_comp, dsize)
-                        outfile.write(f"{len(data_decomp)}\n")
-                        outfile.write(f">>>> {len(zobj.unused_data)}\n") #TODO check on this
+                        logfile.write(f"{len(data_decomp)}\n")
+                        logfile.write(f">>>> {len(zobj.unused_data)}\n") #TODO check on this
                         if data_decomp[0:4] == parasolid_hdr:
                             if data_decomp.find(b'TRANSMIT FILE (deltas)')>0:
                                 open(sldprt_folder / "handwarsh_out" / (sldprt_name + ('_%i' % idx) + '_deltas.x_b'), 'wb').write(data_decomp)
@@ -573,14 +573,14 @@ def extract_ole_sldprt(sldprt_path, geofiles=[]):
                         prevlocn += 4
                         #print("unknown",int.from_bytes(data_comp[prevlocn:(prevlocn+4)],'little'))
                         prevlocn += 4
-                        outfile.write(f"{prevlocn}\n")
+                        logfile.write(f"{prevlocn}\n")
                     else:
-                        hexdump(data[(prevlocn+4+0):(prevlocn+4+16)], outfile)
-                        outfile.write('hmmm\n')
+                        hexdump(data[(prevlocn+4+0):(prevlocn+4+16)], logfile)
+                        logfile.write('hmmm\n')
 
             magiclocns = re.finditer(png_hdr, data)
             for idx, magicloc in enumerate(magiclocns):
-                outfile.write("PNGS\n")
+                logfile.write("PNGS\n")
                 prevlocn = magicloc.start()-4
                 if 1:
                     hexdump(data[(prevlocn + 4 + 0):(prevlocn + 4 + 16)])
@@ -590,12 +590,12 @@ def extract_ole_sldprt(sldprt_path, geofiles=[]):
                         data_comp = data[(prevlocn+4):]
                         #data_decomp = zobj.decompress(data_comp)
                         open(sldprt_folder / "handwarsh_out" / (sldprt_name + ('_%i' % idx) +'.png'),'wb').write(data_comp)
-                        outfile.write(sldprt_name + ('_%i' % idx) +'.png\n')
-                        outfile.write(f"{data_comp[0:64]}\n")
+                        logfile.write(sldprt_name + ('_%i' % idx) +'.png\n')
+                        logfile.write(f"{data_comp[0:64]}\n")
                         prevlocn += len(data_comp)
                     except:
-                        hexdump(data[(prevlocn+4+0):(prevlocn+4+16)], outfile)
-                        outfile.write("hmmm\n")
+                        hexdump(data[(prevlocn+4+0):(prevlocn+4+16)], logfile)
+                        logfile.write("hmmm\n")
                         pass
     ole.close()
 
@@ -636,7 +636,7 @@ def main():
             if str(g).find("deltas") == -1:
                 thegeometry = None
                 #THIS OLD VERSION HAS A PROBLEM IF THERE ARE NURBS OBJECTS IT SEEMS.  INDEXING GOES GOOFY
-                thegeometry, thegeometry2 = read_x_b(data_path=g, outfile_path=sldprt_folder / "handwarsh_out" / f"{g.name}_debuginfo.txt")
+                thegeometry, thegeometry2 = read_x_b(data_path=g, logfile_path=sldprt_folder / "handwarsh_out" / f"{g.name}_debuginfo.txt")
 
 if __name__ == "__main__":
     main()
