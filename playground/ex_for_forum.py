@@ -4,6 +4,7 @@ import olefile
 import struct
 import sys
 import pathlib
+import os
 
 # If FreeCAD is installed with conda, importing `freecad` will set `sys.path` to the correct value
 try: import freecad
@@ -225,7 +226,11 @@ def PStoFC(datatype, mygeom, index, fname, bufferreadfield):
 
     return mygeom
 
-def read_x_b(data_path=None,outfile_path=None):
+def read_x_b(data_path: pathlib.PurePath, outfile_path: pathlib.PurePath):
+    """
+    Reads an x_b file from data_path and outputs debug information to outfile_path.
+    """
+
     #https://github.com/armthethinker/LGBTQ_VR_Museum/tree/df3c3084ee6decd5c9d8204134076fe207671da7/VRLiDARFromScratch/Assets/Plugins/PixyzPluginForUnity/Editor/Bin/PsSchema
     schema = load_schema('parasolid_schemas/sch_13006.sch_txt')
     #schema = load_schema('parasolid_schemas/sch_14000.sch_txt')
@@ -234,31 +239,31 @@ def read_x_b(data_path=None,outfile_path=None):
     data = bytearray(data_file.read())
     data_file.close()
 
-    outfile = open(outfile_path, 'wt') #MattC
-    mygeom = []  # MattC
-    mynodes = [] # MattC
+    outfile = open(outfile_path, 'wt')
+    mygeom = []
+    mynodes = []
 
     # Load header
 
-    if data.startswith(b'*'): #MattC to bytes
-        eoh = b'**END_OF_HEADER*****************************************************************\n' #MattC to bytes
+    if data.startswith(b'*'):
+        eoh = b'**END_OF_HEADER*****************************************************************\n'
         eoh_pos = data.find(eoh)
         header, data = data[:eoh_pos] + eoh, data[eoh_pos + len(eoh):]
         outfile.write(f"header = x_b_header {{\n")
-        outfile.write(header) #MattC
-        outfile.write(f'\n}};\n') #MattC
+        outfile.write(header)
+        outfile.write(f'\n}};\n')
     assert data[:4] == b'PS\0\0'
 
     # Load head metadata
 
     buf = Buffer(data[4:])
 
-    str1 = buf.string(buf.int16()) #MattC
+    str1 = buf.string(buf.int16())
     outfile.write(f'str1 = "{str1.decode()}";\n')
-    str2 = buf.string(buf.int32()) #MattC
+    str2 = buf.string(buf.int32())
     outfile.write(f'str2 = "{str2.decode()}";\n')
     user_field_size = buf.int16()
-    outfile.write(f"user_field_size = {user_field_size};\n") #MattC
+    outfile.write(f"user_field_size = {user_field_size};\n")
 
     unk = buf.int32()
     assert unk == 0
@@ -363,7 +368,7 @@ def read_x_b(data_path=None,outfile_path=None):
     outfile.close() #MattC
     return mygeom , mynodes#MattC
     
-def hexdump(data):
+def hexdump(data, outfile=sys.stdout):
     data = bytearray(data)
     for i in range(0, len(data), 16):
         hc = ''
@@ -382,7 +387,7 @@ def hexdump(data):
             if j == 7:
                 hc += ' '
                 ac += ' '
-        print('%08x  %s | %s' % (i, hc, ac))
+        outfile.write('%08x  %s | %s\n' % (i, hc, ac))
 
 def readFile(afile, adirname, indent, parentname):
     sectionname = afile.name.encode("utf-8")  # becomes a byte array
@@ -452,11 +457,11 @@ def extract_nonole_sldprt(sldprt_path, geofiles=[]):
             if data_decomp[0:4] == parasolid_hdr:
                 hexdump(data_decomp)
                 if data_decomp.find(b'TRANSMIT FILE (deltas)') > 0:
-                    open(sldprt_folder / ('mytestgeomdelta'+ ('_%i') % z + '_deltas.x_b'), 'wb').write(data_decomp)
-                    geofiles.append(sldprt_folder / ('mytestgeomdelta'+ ('_%i') % z + '_deltas.x_b'))
+                    open(sldprt_folder / "handwarsh_out" / ('mytestgeomdelta'+ ('_%i') % z + '_deltas.x_b'), 'wb').write(data_decomp)
+                    geofiles.append(sldprt_folder / "handwarsh_out" / ('mytestgeomdelta'+ ('_%i') % z + '_deltas.x_b'))
                 else:
-                    open(sldprt_folder / ('mytestgeom' + ('_%i') % z + '.x_b'), 'wb').write(data_decomp)
-                    geofiles.append(sldprt_folder / ('mytestgeom' + ('_%i') % z + '.x_b'))
+                    open(sldprt_folder / "handwarsh_out" / ('mytestgeom' + ('_%i') % z + '.x_b'), 'wb').write(data_decomp)
+                    geofiles.append(sldprt_folder / "handwarsh_out" / ('mytestgeom' + ('_%i') % z + '.x_b'))
         '''
         png_locns = [l for l in re.finditer(png_hdr, data_decomp)]
         geometry_locns = [l for l in re.finditer(magic2, data_decomp)]
@@ -521,6 +526,8 @@ def extract_ole_sldprt(sldprt_path, geofiles=[]):
     sldprt_name = str(pathlib.Path(sldprt_path).name)
     sldprt_folder = pathlib.Path(sldprt_path).parent
 
+    outfile = open(sldprt_folder / "handwarsh_out" / f"{sldprt_name}_debuginfo.txt", "wt")
+
     #there can be different kinds of files in this type of archive.  .xlsx, .docx, etc in addition to
     #SW geometry.  That compression schemes is ZIP.  Some of the SW elements are themselves compressed
     # using ZLIB, with first 16 bytes being a header(?) followed by 8 bytes, the first four of which
@@ -530,50 +537,50 @@ def extract_ole_sldprt(sldprt_path, geofiles=[]):
     with olefile.OleFileIO(sldprt_path) as ole:
         dirlist = ole.listdir()
         for d in dirlist:
-            print(d)
+            outfile.write(f"{d}\n")
             test = ole.openstream(d)
             data = test.read()
             datalen = len(data)
 
             magiclocns = re.finditer(magic2, data) #find geom
             magicspots = [line.start() for line in magiclocns]
-            print(magicspots)
-            hexdump(data[:48])
+            outfile.write(f"{magicspots}\n")
+            hexdump(data[:48], outfile)
             #for idx, magicloc in enumerate(magiclocns):
             for idx in magicspots:
                 #prevlocn = magicloc.start()-4
                 prevlocn = idx - 4
                 if 1:
-                    print(data[(prevlocn+4+0):(prevlocn+4+16)])
-                    print(magic2)
+                    outfile.write(f"{data[(prevlocn+4+0):(prevlocn+4+16)]}\n")
+                    outfile.write(f"{magic2}\n")
                     if data[(prevlocn+4+0):(prevlocn+4+16)] == magic2:
                         zobj = zlib.decompressobj()
                         dsize = (int.from_bytes(data[(prevlocn+20):(prevlocn+24)],'little'))
                         csize = (int.from_bytes(data[(prevlocn+24):(prevlocn+28)],'little'))
                         data_comp = data[(prevlocn+28):]
                         data_decomp = zobj.decompress(data_comp, dsize)
-                        print(len(data_decomp))
-                        print(">>>>",len(zobj.unused_data)) #TODO check on this
+                        outfile.write(f"{len(data_decomp)}\n")
+                        outfile.write(f">>>> {len(zobj.unused_data)}\n") #TODO check on this
                         if data_decomp[0:4] == parasolid_hdr:
                             if data_decomp.find(b'TRANSMIT FILE (deltas)')>0:
-                                open(sldprt_folder / (sldprt_name + ('_%i' % idx) + '_deltas.x_b'), 'wb').write(data_decomp)
-                                geofiles.append(sldprt_folder / (sldprt_name + ('_%i' % idx) + '_deltas.x_b'))
+                                open(sldprt_folder / "handwarsh_out" / (sldprt_name + ('_%i' % idx) + '_deltas.x_b'), 'wb').write(data_decomp)
+                                geofiles.append(sldprt_folder / "handwarsh_out" / (sldprt_name + ('_%i' % idx) + '_deltas.x_b'))
                             else:
-                                open(sldprt_folder / (sldprt_name + ('_%i' % idx) + '.x_b'), 'wb').write(data_decomp)
-                                geofiles.append(sldprt_folder / (sldprt_name + ('_%i' % idx) + '.x_b'))
+                                open(sldprt_folder / "handwarsh_out" / (sldprt_name + ('_%i' % idx) + '.x_b'), 'wb').write(data_decomp)
+                                geofiles.append(sldprt_folder / "handwarsh_out" / (sldprt_name + ('_%i' % idx) + '.x_b'))
                         prevlocn += (datalen-len(zobj.unused_data))
                         #print("unknown",int.from_bytes(data_comp[prevlocn:(prevlocn+4)],'little'))
                         prevlocn += 4
                         #print("unknown",int.from_bytes(data_comp[prevlocn:(prevlocn+4)],'little'))
                         prevlocn += 4
-                        print(prevlocn)
+                        outfile.write(f"{prevlocn}\n")
                     else:
-                        hexdump(data[(prevlocn+4+0):(prevlocn+4+16)])
-                        print('hmmm')
+                        hexdump(data[(prevlocn+4+0):(prevlocn+4+16)], outfile)
+                        outfile.write('hmmm\n')
 
             magiclocns = re.finditer(png_hdr, data)
             for idx, magicloc in enumerate(magiclocns):
-                print("PNGS")
+                outfile.write("PNGS\n")
                 prevlocn = magicloc.start()-4
                 if 1:
                     hexdump(data[(prevlocn + 4 + 0):(prevlocn + 4 + 16)])
@@ -582,13 +589,13 @@ def extract_ole_sldprt(sldprt_path, geofiles=[]):
                         #zobj = zlib.decompressobj()
                         data_comp = data[(prevlocn+4):]
                         #data_decomp = zobj.decompress(data_comp)
-                        open(sldprt_name + ('_%i' % idx) +'.png','wb').write(data_comp)
-                        print(sldprt_name + ('_%i' % idx) +'.png')
-                        print(data_comp[0:64])
+                        open(sldprt_folder / "handwarsh_out" / (sldprt_name + ('_%i' % idx) +'.png'),'wb').write(data_comp)
+                        outfile.write(sldprt_name + ('_%i' % idx) +'.png\n')
+                        outfile.write(f"{data_comp[0:64]}\n")
                         prevlocn += len(data_comp)
                     except:
-                        hexdump(data[(prevlocn+4+0):(prevlocn+4+16)])
-                        print('hmmm')
+                        hexdump(data[(prevlocn+4+0):(prevlocn+4+16)], outfile)
+                        outfile.write("hmmm\n")
                         pass
     ole.close()
 
@@ -596,6 +603,7 @@ def main():
     sldprt_path = sys.argv[1]
     sldprt_name = str(pathlib.Path(sldprt_path).name)
     sldprt_folder = pathlib.Path(sldprt_path).parent
+    os.makedirs(sldprt_folder / "handwarsh_out", exist_ok=True)
 
     magics = [magic1,zlib_hdr,xml_hdr,png_hdr,parasolid_hdr]
 
@@ -624,10 +632,11 @@ def main():
         print("No geometry was created")
     else:
         for g in geofiles:
+            print(f"Processing extracted file {g}...")
             if str(g).find("deltas") == -1:
                 thegeometry = None
                 #THIS OLD VERSION HAS A PROBLEM IF THERE ARE NURBS OBJECTS IT SEEMS.  INDEXING GOES GOOFY
-                thegeometry, thegeometry2 = read_x_b(data_path=g, outfile_path=sldprt_folder / f"{g.name}_debuginfo.txt")
+                thegeometry, thegeometry2 = read_x_b(data_path=g, outfile_path=sldprt_folder / "handwarsh_out" / f"{g.name}_debuginfo.txt")
 
 if __name__ == "__main__":
     main()
