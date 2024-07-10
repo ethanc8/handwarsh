@@ -225,67 +225,72 @@ def PStoFC(datatype, mygeom, index, fname, bufferreadfield):
 
     return mygeom
 
-def read_x_b(fn=None,ff=None,fp=None,fe=None):
+def read_x_b(data_path=None,outfile_path=None):
     #https://github.com/armthethinker/LGBTQ_VR_Museum/tree/df3c3084ee6decd5c9d8204134076fe207671da7/VRLiDARFromScratch/Assets/Plugins/PixyzPluginForUnity/Editor/Bin/PsSchema
     schema = load_schema('parasolid_schemas/sch_13006.sch_txt')
     #schema = load_schema('parasolid_schemas/sch_14000.sch_txt')
 
-    f = open(fn, 'rb')
-    data = bytearray(f.read())
-    f.close()
+    data_file = open(data_path, 'rb')
+    data = bytearray(data_file.read())
+    data_file.close()
 
-    outfile = open('%s' % (fp + fe), 'wt') #MattC
+    outfile = open(outfile_path, 'wt') #MattC
     mygeom = []  # MattC
     mynodes = [] # MattC
 
+    # Load header
+
     if data.startswith(b'*'): #MattC to bytes
         eoh = b'**END_OF_HEADER*****************************************************************\n' #MattC to bytes
-        cut = data.find(eoh)
-        header, data = data[:cut] + eoh, data[cut + len(eoh):]
+        eoh_pos = data.find(eoh)
+        header, data = data[:eoh_pos] + eoh, data[eoh_pos + len(eoh):]
+        outfile.write(f"header = x_b_header {{\n")
         outfile.write(header) #MattC
-        outfile.write(b'\n\r') #MattC
+        outfile.write(f'\n}};\n') #MattC
     assert data[:4] == b'PS\0\0'
+
+    # Load head metadata
 
     buf = Buffer(data[4:])
 
     str1 = buf.string(buf.int16()) #MattC
-    print(str1) #MattC
-    outfile.write(str1.decode()) #MattC
-    outfile.write('\n') #MattC
+    outfile.write(f'str1 = "{str1.decode()}";\n')
     str2 = buf.string(buf.int32()) #MattC
-    print(str2) #MattC
-    outfile.write(str2.decode()) #MattC
-    outfile.write('\n') #MattC
-    user_field_size = buf.int16() #MattC
-    print('user_field_size:', user_field_size) #MattC
-    outfile.write('user_field_size: %i\n' % user_field_size) #MattC
+    outfile.write(f'str2 = "{str2.decode()}";\n')
+    user_field_size = buf.int16()
+    outfile.write(f"user_field_size = {user_field_size};\n") #MattC
 
     unk = buf.int32()
     assert unk == 0
+    outfile.write(f"unk = {unk};\n")
+
+    # Load all the nodes
+
+    outfile.write("nodes = [\n")
 
     types_seen = []
     while not buf.end():
         datatype = buf.int16()
         if datatype == 1:
-            print('Terminator!')
-            outfile.write('Terminator!\n') #MattC
-            #assert buf.uint16() == 1 #MattC
-            #assert buf.end() #MattC
-            temp = buf.uint16() #MattC
-            print(temp) #MattC
-            assert temp == 1
-            temp = buf.end() #MattC
-            print(temp) #MattC
-            if temp:
-                print('EOF ok')
+            outfile.write('1 __terminator__ {\n')
+            terminator_a = buf.uint16()
+            outfile.write(f"    terminator_a: {terminator_a};\n")
+            assert terminator_a == 1
+            terminator_b = buf.end()
+            outfile.write(f"    terminator_b: {terminator_b};\n")
+            if terminator_b:
+                outfile.write('    // EOF ok\n')
             else:
-                print('Problem ?')
+                outfile.write('    // Problem ?\n')
+            outfile.write("}\n")
             break
         if datatype in schema:
             name, desc, tx, var, fields = schema[datatype]
-            print('Node %i %s' % (datatype, name))
-            outfile.write('Node %i %s\n' % (datatype, name)) #MattC
-            if datatype not in types_seen:  # embedded schema time
+            outfile.write(f"{datatype} {name} {{\n")
+            # If this is the first time we've seen this node type, then
+            # it comes with a schema
+            if datatype not in types_seen:
+                outfile.write("    __schema__: {\n")
                 types_seen.append(datatype)
                 nf = buf.uint8()
                 if nf != 0xFF:
@@ -294,21 +299,17 @@ def read_x_b(fn=None,ff=None,fp=None,fe=None):
                     while True:
                         c = buf.char()
                         if c == 'C':
-                            print('\tAppended fields:', fields[ptr]) #MattC
-                            outfile.write('\tAppended fields: '+(str(fields[ptr]))+'\n') #MattC
+                            outfile.write('        Appended fields: '+(str(fields[ptr]))+'\n') #MattC
                             new_fields.append(fields[ptr])
                             ptr += 1
                         elif c == 'D':
-                            print('\tDeleted field:', fields[ptr]) #MattC
-                            outfile.write('\tDeleted field: '+(str(fields[ptr]))+'\n') #MattC
+                            outfile.write('        Deleted field: '+(str(fields[ptr]))+'\n') #MattC
                             ptr += 1
                         elif c == 'I' or c == 'A':
                             if c == 'I':
-                                print('\tInserting field:', end=' ')
-                                outfile.write('\tInserting field:\n') #MattC
+                                outfile.write('        Inserting field:\n') #MattC
                             else:
-                                print('\tAppending field:', end=' ')
-                                outfile.write('\tAppending field:\n') #MattC
+                                outfile.write('        Appending field:\n') #MattC
                             fname = buf.string(buf.uint8())
                             ptr_class = buf.uint16()
                             fne = buf.ptr()
@@ -319,33 +320,29 @@ def read_x_b(fn=None,ff=None,fp=None,fe=None):
                             if fne == 1:
                                 xmt_code = buf.uint8()
                             try:
-                                print('\t\t', new_fields[-1]) #MattC
-                                outfile.write('\t\t'+(str(new_fields[-1])+'\n')) #MattC
+                                outfile.write('            '+(str(new_fields[-1])+'\n')) #MattC
                                 new_fields.append((fname.decode('utf-8'), ftype, ptr_class, fne))  # MattC
                             except:
-                                print("Ignore; = KLUDGE to work around problem chars")
-                                print('\t\tPROB chars? ', new_fields[-1]) #MattC
-                                outfile.write('\t\tPROB chars?'+(str(new_fields[-1])+'\n')) #MattC
+                                outfile.write("            // Ignore below; = KLUDGE to work around problem chars")
+                                outfile.write('            PROB chars?'+(str(new_fields[-1])+'\n')) #MattC
                                 new_fields.append(('UNKNOWN', ftype, ptr_class, fne))  # MattC
                         elif c == 'Z':
                             break
                         else:
-                            outfile.write('Unknown schema character %r\n' % c) #MattC
-                            print('PROBLEM schema character %r' % c) #MattC
+                            outfile.write('        Unknown schema character %r\n' % c) #MattC
                             #raise Exception('Unknown schema character %r' % c) #MattC
                     schema[datatype][4] = new_fields
                     fields = new_fields
+                outfile.write("    },\n")
             assert tx
             if var:
                 var_size = buf.int32()
-                print('Variable size:', var_size)
-                outfile.write('\tVariable size: %i\n' % (var_size)) #MattC
+                outfile.write(f"    __variable_size__: {var_size};\n") #MattC
             else:
                 var_size = -1
             node = {} # MattC not used ????
             index = buf.int16()
-            print('Node index:', index)
-            outfile.write('\tNode index: %i\n' % (index)) #MattC
+            outfile.write(f"    __index__: {index};\n") #MattC
 
             mygeom.append([datatype, [index]])
             mynodes.append([index, datatype, var_size, fields])
@@ -353,15 +350,17 @@ def read_x_b(fn=None,ff=None,fp=None,fe=None):
             for fname, ftype, nc, ne in fields:
                 #print('\t' + fname, buf.read_field(ftype, ne, var_size)) #MattC
                 bufferreadfield = buf.read_field(ftype, ne, var_size) #MattC
-                print('\t', fname, '\t', bufferreadfield) #MattC
-                outfile.write('\t'+fname+'\t'+str(bufferreadfield) + '\n')  # MattC
+                outfile.write(f"    {fname}: {bufferreadfield};\n")  # MattC
                 #Proof of concept test ...#MattC
                 #May need to change this to not collecting by datatype??
                 mygeom = PStoFC(datatype, mygeom, index, fname, bufferreadfield) #MattC
+            outfile.write("},\n") # end this node
 
         else:
             print('unknown datatype:', datatype)
+            outfile.write(f"{datatype} __unknown__ {{}}, // fatal error: unknown datatype\n")
             assert False
+    outfile.write("]\n") # end "nodes"
     outfile.close() #MattC
     return mygeom , mynodes#MattC
     
@@ -420,17 +419,18 @@ xml_hdr = b'\x3C\x3F\x78\x6D\x6C'
 png_hdr = b'\x89\x50\x4E\x47'
 parasolid_hdr = b'PS\x00\x00'
 
-full_filename = sys.argv[1]
-filename = str(pathlib.Path(full_filename).parent)
+sldprt_path = sys.argv[1]
+sldprt_name = str(pathlib.Path(sldprt_path).name)
+sldprt_folder = pathlib.Path(sldprt_path).parent
 
 magics = [magic1,zlib_hdr,xml_hdr,png_hdr,parasolid_hdr]
 
 OLEbased = False
 
-print(filename)
+print(sldprt_path)
 
 try:
-    assert olefile.isOleFile(filename)
+    assert olefile.isOleFile(sldprt_path)
     OLEbased = True
 except:
     OLEbased = False
@@ -440,9 +440,9 @@ print("OLE based : ", OLEbased)
 geofiles = []
 
 if not OLEbased:
-    with open(full_filename, 'rb') as fh:
-        data = fh.read()
-        file_size = fh.tell()
+    with open(sldprt_path, 'rb') as sldprt_file:
+        data = sldprt_file.read()
+        file_size = sldprt_file.tell()
         #print(file_size)
 
         markers_zlib = re.finditer(zlib_hdr, data)
@@ -467,11 +467,11 @@ if not OLEbased:
                 if data_decomp[0:4] == parasolid_hdr:
                     hexdump(data_decomp)
                     if data_decomp.find(b'TRANSMIT FILE (deltas)') > 0:
-                        open('mytestgeomdelta'+ ('_%i') % z + '_deltas.x_b', 'wb').write(data_decomp)
-                        geofiles.append('mytestgeomdelta' + ('_%i') % z+ '_deltas.x_b')
+                        open(sldprt_folder / ('mytestgeomdelta'+ ('_%i') % z + '_deltas.x_b'), 'wb').write(data_decomp)
+                        geofiles.append(sldprt_folder / ('mytestgeomdelta'+ ('_%i') % z + '_deltas.x_b'))
                     else:
-                        open('mytestgeom' + ('_%i') % z + '.x_b', 'wb').write(data_decomp)
-                        geofiles.append('mytestgeom' + ('_%i') % z + '.x_b')
+                        open(sldprt_folder / ('mytestgeom' + ('_%i') % z + '.x_b'), 'wb').write(data_decomp)
+                        geofiles.append(sldprt_folder / ('mytestgeom' + ('_%i') % z + '.x_b'))
             '''
             png_locns = [l for l in re.finditer(png_hdr, data_decomp)]
             geometry_locns = [l for l in re.finditer(magic2, data_decomp)]
@@ -539,7 +539,7 @@ elif OLEbased:
     # are the length of the compressed data.  Remaining four are length of uncompressed data???
     #In any case, the SW geometry is compress using ZLIB and begins with 4 bytes: b'PS\0\0'
 
-    with olefile.OleFileIO(full_filename) as ole:
+    with olefile.OleFileIO(sldprt_path) as ole:
         dirlist = ole.listdir()
         for d in dirlist:
             print(d)
@@ -568,11 +568,11 @@ elif OLEbased:
                         print(">>>>",len(zobj.unused_data)) #TODO check on this
                         if data_decomp[0:4] == parasolid_hdr:
                             if data_decomp.find(b'TRANSMIT FILE (deltas)')>0:
-                                open(filename + ('_%i' % idx) + '_deltas.x_b', 'wb').write(data_decomp)
-                                geofiles.append(filename + ('_%i' % idx) + '_deltas.x_b')
+                                open(sldprt_folder / (sldprt_name + ('_%i' % idx) + '_deltas.x_b'), 'wb').write(data_decomp)
+                                geofiles.append(sldprt_folder / (sldprt_name + ('_%i' % idx) + '_deltas.x_b'))
                             else:
-                                open(filename + ('_%i' % idx) + '.x_b', 'wb').write(data_decomp)
-                                geofiles.append(filename + ('_%i' % idx) + '.x_b')
+                                open(sldprt_folder / (sldprt_name + ('_%i' % idx) + '.x_b'), 'wb').write(data_decomp)
+                                geofiles.append(sldprt_folder / (sldprt_name + ('_%i' % idx) + '.x_b'))
                         prevlocn += (datalen-len(zobj.unused_data))
                         #print("unknown",int.from_bytes(data_comp[prevlocn:(prevlocn+4)],'little'))
                         prevlocn += 4
@@ -594,8 +594,8 @@ elif OLEbased:
                         #zobj = zlib.decompressobj()
                         data_comp = data[(prevlocn+4):]
                         #data_decomp = zobj.decompress(data_comp)
-                        open(filename + ('_%i' % idx) +'.png','wb').write(data_comp)
-                        print(filename + ('_%i' % idx) +'.png')
+                        open(sldprt_name + ('_%i' % idx) +'.png','wb').write(data_comp)
+                        print(sldprt_name + ('_%i' % idx) +'.png')
                         print(data_comp[0:64])
                         prevlocn += len(data_comp)
                     except:
@@ -612,10 +612,10 @@ if not geofiles:
     print("No geometry was created")
 else:
     for g in geofiles:
-        if g.find("deltas") == -1:
+        if str(g).find("deltas") == -1:
             thegeometry = None
             #THIS OLD VERSION HAS A PROBLEM IF THERE ARE NURBS OBJECTS IT SEEMS.  INDEXING GOES GOOFY
-            thegeometry, thegeometry2 = read_x_b(g, '/home/matt/Downloads/Parasolid/', 'debuginfo', '.txt')
+            thegeometry, thegeometry2 = read_x_b(data_path=g, outfile_path=sldprt_folder / f"{g.name}_debuginfo.txt")
 
 
 
