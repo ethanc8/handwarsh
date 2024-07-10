@@ -138,93 +138,76 @@ def load_schema(fn):
 
     return node_types
 
-def PStoFC(datatype, mygeom, index, fname, bufferreadfield):
+def PStoFC(datatype, geom, index, fname, bufferreadfield):
     #This could probably be streamlined to one call outside of a loop in read_x_b
     if datatype == 31:  # CIRCLE
-        for x in mygeom:
-            if x[0] == datatype:
-                for y in x:
-                    if isinstance(y, list):
-                        if y[0] == index:
-                            if fname == 'centre':
-                                y.append(['centre', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
-                                print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
-                            elif fname == 'normal':
-                                y.append(['normal', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
-                                print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
-                            elif fname == 'x_axis':
-                                y.append(['x_axis', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
-                                print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
-                            elif fname == 'radius':
-                                y.append(['radius', bufferreadfield])
-                            elif fname == 'next':
-                                y.append(['next', bufferreadfield])
-                            elif fname == 'previous':
-                                y.append(['previous', bufferreadfield])
-                            elif fname == 'node_id':
-                                y.append(['node_id', bufferreadfield])
-                            elif fname == 'owner':
-                                y.append(['owner', bufferreadfield])
-                            elif fname == 'identifier':
-                                y.append(['identifier', bufferreadfield])
-                                print(bufferreadfield)  # this is a float
+        if fname == 'centre':
+            geom.append(['centre', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
+            print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
+        elif fname == 'normal':
+            geom.append(['normal', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
+            print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
+        elif fname == 'x_axis':
+            geom.append(['x_axis', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
+            print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
+        elif fname == 'radius':
+            geom.append(['radius', bufferreadfield])
+        elif fname == 'next':
+            geom.append(['next', bufferreadfield])
+        elif fname == 'previous':
+            geom.append(['previous', bufferreadfield])
+        elif fname == 'node_id':
+            geom.append(['node_id', bufferreadfield])
+        elif fname == 'owner':
+            geom.append(['owner', bufferreadfield])
+        elif fname == 'identifier':
+            geom.append(['identifier', bufferreadfield])
+            print(bufferreadfield)  # this is a float
     if datatype == 51:  # CYLINDER
-        for x in mygeom:
-            if x[0] == datatype:
-                for y in x:
-                    if isinstance(y, list):
-                        if y[0] == index:
-                            if fname == 'pvec':
-                                y.append(['centre', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
-                            elif fname == 'axis':
-                                y.append(['normal', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
-                                print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
-                            elif fname == 'x_axis':
-                                y.append(['x_axis', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
-                                print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
-                            elif fname == 'radius':
-                                y.append(['radius', bufferreadfield])
-                                print(bufferreadfield)  # this is a float
-                            elif fname == 'next':
-                                y.append(['next', bufferreadfield])
-                            elif fname == 'previous':
-                                y.append(['previous', bufferreadfield])
-                            elif fname == 'node_id':
-                                y.append(['node_id', bufferreadfield])
-                            elif fname == 'owner':
-                                y.append(['owner', bufferreadfield])
-                            elif fname == 'identifier':
-                                y.append(['identifier', bufferreadfield])
+        if fname == 'pvec':
+            geom.append(['centre', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
+        elif fname == 'axis':
+            geom.append(['normal', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
+            print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
+        elif fname == 'x_axis':
+            geom.append(['x_axis', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
+            print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
+        elif fname == 'radius':
+            geom.append(['radius', bufferreadfield])
+            print(bufferreadfield)  # this is a float
+        elif fname == 'next':
+            geom.append(['next', bufferreadfield])
+        elif fname == 'previous':
+            geom.append(['previous', bufferreadfield])
+        elif fname == 'node_id':
+            geom.append(['node_id', bufferreadfield])
+        elif fname == 'owner':
+            geom.append(['owner', bufferreadfield])
+        elif fname == 'identifier':
+            geom.append(['identifier', bufferreadfield])
     if datatype == 50:  # PLANE
-        for x in mygeom:
-            if x[0] == datatype:
-                for y in x:
-                    if isinstance(y, list):
-                        if y[0] == index:
-                            if fname == 'pvec':
-                                y.append(['centre', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
-                                print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
-                            elif fname == 'normal':
-                                y.append(['normal', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
-                                print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
-                            elif fname == 'x_axis':
-                                y.append(['x_axis', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
-                                print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
-                            #elif fname == 'radius':
-                            #    y.append(['radius', bufferreadfield])
-                            #    print(bufferreadfield)  # this is a float
-                            elif fname == 'next':
-                                y.append(['next', bufferreadfield])
-                            elif fname == 'previous':
-                                y.append(['previous', bufferreadfield])
-                            elif fname == 'node_id':
-                                y.append(['node_id', bufferreadfield])
-                            elif fname == 'owner':
-                                y.append(['owner', bufferreadfield])
-                            elif fname == 'identifier':
-                                y.append(['identifier', bufferreadfield])
-
-    return mygeom
+        if fname == 'pvec':
+            geom.append(['centre', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
+            print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
+        elif fname == 'normal':
+            geom.append(['normal', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
+            print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
+        elif fname == 'x_axis':
+            geom.append(['x_axis', bufferreadfield[0], bufferreadfield[1], bufferreadfield[2]])
+            print(bufferreadfield[0], bufferreadfield[1], bufferreadfield[2])
+        #elif fname == 'radius':
+        #    y.append(['radius', bufferreadfield])
+        #    print(bufferreadfield)  # this is a float
+        elif fname == 'next':
+            geom.append(['next', bufferreadfield])
+        elif fname == 'previous':
+            geom.append(['previous', bufferreadfield])
+        elif fname == 'node_id':
+            geom.append(['node_id', bufferreadfield])
+        elif fname == 'owner':
+            geom.append(['owner', bufferreadfield])
+        elif fname == 'identifier':
+            geom.append(['identifier', bufferreadfield])
 
 def read_x_b(data_path: pathlib.PurePath, logfile_path: pathlib.PurePath):
     """
@@ -240,8 +223,8 @@ def read_x_b(data_path: pathlib.PurePath, logfile_path: pathlib.PurePath):
     data_file.close()
 
     logfile = open(logfile_path, 'wt')
-    mygeom = []
-    mynodes = []
+    geoms = []
+    nodes = []
 
     # Load header
 
@@ -349,15 +332,26 @@ def read_x_b(data_path: pathlib.PurePath, logfile_path: pathlib.PurePath):
             index = buf.int16()
             logfile.write(f"    __index__: {index};\n") #MattC
 
-            mygeom.append([datatype, [index]])
-            mynodes.append([index, datatype, var_size, fields])
+            geom = [index]
+            geoms.append([datatype, geom])
+            nodes.append([index, datatype, var_size, fields])
 
             for fname, ftype, nc, ne in fields:
                 bufferreadfield = buf.read_field(ftype, ne, var_size)
                 logfile.write(f"    {fname}: {bufferreadfield};\n")
                 #Proof of concept test ...
                 #May need to change this to not collecting by datatype??
-                mygeom = PStoFC(datatype, mygeom, index, fname, bufferreadfield)
+                # PStoFC(datatype, geom, index, fname, bufferreadfield)
+            # if len(geom) > 1:
+            #     logfile.write("    __geom__: {\n")
+            #     for geom_kvpair in geom:
+            #         if type(geom_kvpair) is int:
+            #             continue
+            #         elif len(geom_kvpair) == 2:
+            #             logfile.write(f"        {geom_kvpair[0]}: {geom_kvpair[1]};\n")
+            #         elif len(geom_kvpair) > 2:
+            #             logfile.write(f"        {geom_kvpair[0]}: {geom_kvpair[1:]};\n")
+            #     logfile.write("    };\n")
             logfile.write("},\n") # end this node
 
         else:
@@ -366,7 +360,7 @@ def read_x_b(data_path: pathlib.PurePath, logfile_path: pathlib.PurePath):
             assert False
     logfile.write("]\n") # end "nodes"
     logfile.close() #MattC
-    return mygeom , mynodes#MattC
+    return geoms , nodes#MattC
     
 def hexdump(data, logfile=sys.stdout):
     data = bytearray(data)
