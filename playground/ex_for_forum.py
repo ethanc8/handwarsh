@@ -348,12 +348,11 @@ def read_x_b(data_path=None,outfile_path=None):
             mynodes.append([index, datatype, var_size, fields])
 
             for fname, ftype, nc, ne in fields:
-                #print('\t' + fname, buf.read_field(ftype, ne, var_size)) #MattC
-                bufferreadfield = buf.read_field(ftype, ne, var_size) #MattC
-                outfile.write(f"    {fname}: {bufferreadfield};\n")  # MattC
-                #Proof of concept test ...#MattC
+                bufferreadfield = buf.read_field(ftype, ne, var_size)
+                outfile.write(f"    {fname}: {bufferreadfield};\n")
+                #Proof of concept test ...
                 #May need to change this to not collecting by datatype??
-                mygeom = PStoFC(datatype, mygeom, index, fname, bufferreadfield) #MattC
+                mygeom = PStoFC(datatype, mygeom, index, fname, bufferreadfield)
             outfile.write("},\n") # end this node
 
         else:
