@@ -2,8 +2,10 @@ import re
 import zlib
 import olefile
 import struct
+import sys
+import pathlib
 
-# If FreeCAD is installed with conda
+# If FreeCAD is installed with conda, importing `freecad` will set `sys.path` to the correct value
 try: import freecad
 except: pass
 
@@ -225,8 +227,8 @@ def PStoFC(datatype, mygeom, index, fname, bufferreadfield):
 
 def read_x_b(fn=None,ff=None,fp=None,fe=None):
     #https://github.com/armthethinker/LGBTQ_VR_Museum/tree/df3c3084ee6decd5c9d8204134076fe207671da7/VRLiDARFromScratch/Assets/Plugins/PixyzPluginForUnity/Editor/Bin/PsSchema
-    schema = load_schema('/home/matt/Downloads/Parasolid/PsSchema/sch_13006.sch_txt')
-    #schema = load_schema('/home/matt/Downloads/Parasolid/PsSchema/sch_14000.sch_txt')
+    schema = load_schema('parasolid_schemas/sch_13006.sch_txt')
+    #schema = load_schema('parasolid_schemas/sch_14000.sch_txt')
 
     f = open(fn, 'rb')
     data = bytearray(f.read())
@@ -418,18 +420,17 @@ xml_hdr = b'\x3C\x3F\x78\x6D\x6C'
 png_hdr = b'\x89\x50\x4E\x47'
 parasolid_hdr = b'PS\x00\x00'
 
-
-file_folder = '/home/matt/Downloads/Parasolid/SWexamples/ball-80.snapshot.1/'
-file_name1 = 'Ball.SLDPRT'
+full_filename = sys.argv[1]
+filename = str(pathlib.Path(full_filename).parent)
 
 magics = [magic1,zlib_hdr,xml_hdr,png_hdr,parasolid_hdr]
 
 OLEbased = False
 
-print(file_folder+file_name1)
+print(filename)
 
 try:
-    assert olefile.isOleFile(file_folder+file_name1)
+    assert olefile.isOleFile(filename)
     OLEbased = True
 except:
     OLEbased = False
@@ -439,7 +440,7 @@ print("OLE based : ", OLEbased)
 geofiles = []
 
 if not OLEbased:
-    with open(file_folder + file_name1, 'rb') as fh:
+    with open(full_filename, 'rb') as fh:
         data = fh.read()
         file_size = fh.tell()
         #print(file_size)
@@ -538,7 +539,7 @@ elif OLEbased:
     # are the length of the compressed data.  Remaining four are length of uncompressed data???
     #In any case, the SW geometry is compress using ZLIB and begins with 4 bytes: b'PS\0\0'
 
-    with olefile.OleFileIO(file_folder+file_name1) as ole:
+    with olefile.OleFileIO(full_filename) as ole:
         dirlist = ole.listdir()
         for d in dirlist:
             print(d)
@@ -567,11 +568,11 @@ elif OLEbased:
                         print(">>>>",len(zobj.unused_data)) #TODO check on this
                         if data_decomp[0:4] == parasolid_hdr:
                             if data_decomp.find(b'TRANSMIT FILE (deltas)')>0:
-                                open(file_name1 + ('_%i' % idx) + '_deltas.x_b', 'wb').write(data_decomp)
-                                geofiles.append(file_name1 + ('_%i' % idx) + '_deltas.x_b')
+                                open(filename + ('_%i' % idx) + '_deltas.x_b', 'wb').write(data_decomp)
+                                geofiles.append(filename + ('_%i' % idx) + '_deltas.x_b')
                             else:
-                                open(file_name1 + ('_%i' % idx) + '.x_b', 'wb').write(data_decomp)
-                                geofiles.append(file_name1 + ('_%i' % idx) + '.x_b')
+                                open(filename + ('_%i' % idx) + '.x_b', 'wb').write(data_decomp)
+                                geofiles.append(filename + ('_%i' % idx) + '.x_b')
                         prevlocn += (datalen-len(zobj.unused_data))
                         #print("unknown",int.from_bytes(data_comp[prevlocn:(prevlocn+4)],'little'))
                         prevlocn += 4
@@ -593,8 +594,8 @@ elif OLEbased:
                         #zobj = zlib.decompressobj()
                         data_comp = data[(prevlocn+4):]
                         #data_decomp = zobj.decompress(data_comp)
-                        open(file_name1 + ('_%i' % idx) +'.png','wb').write(data_comp)
-                        print(file_name1 + ('_%i' % idx) +'.png')
+                        open(filename + ('_%i' % idx) +'.png','wb').write(data_comp)
+                        print(filename + ('_%i' % idx) +'.png')
                         print(data_comp[0:64])
                         prevlocn += len(data_comp)
                     except:
